@@ -181,8 +181,8 @@ sub artistAlbums {
 	my ($self, $cb, $id) = @_;
 
 	$self->_get("/artist/$id/albums", sub {
-		my $albums = shift->{data};
-		$cb->($albums || []);
+		my $albums = [ grep { !$cache->get("deezer_album_empty_$_->{id}") } @{shift->{data} || []} ];
+		$cb->($albums);
 	},{
 		limit => MAX_LIMIT,
 	});
@@ -298,6 +298,10 @@ sub albumTracks {
 			$tracks = Plugins::Deezer::API->cacheTrackMetadata( [grep {
 				$_->{readable} || (defined $_->{id} && $_->{id} < 0)
 			} @$tracks], { album => $album } ) if $tracks;
+
+			# If no tracks are playable, remember this so artistAlbums can hide
+			# the album from the listing (24h TTL to recover after subscription changes).
+			$cache->set("deezer_album_empty_$id", 1, 86400) unless $tracks && @$tracks;
 
 			$cb->($tracks || []);
 		}, {

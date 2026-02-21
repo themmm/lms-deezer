@@ -58,6 +58,9 @@ sub albumTracks {
 		$_->{readable} || (defined $_->{id} && $_->{id} < 0)
 	} @{$tracks->{data} || []}], { album => $album } ) if $tracks;
 
+	# If no tracks are playable, cache this so artistAlbums hides the album from listings.
+	$cache->set("deezer_album_empty_$id", 1, 86400) unless $tracks && @$tracks;
+
 	return $tracks;
 }
 
