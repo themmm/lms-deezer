@@ -288,7 +288,10 @@ sub albumTracks {
 			my $tracks = shift;
 			$tracks = $tracks->{data} if $tracks;
 			# only missing data in album/tracks is the album itself...
-			$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $album } ) if $tracks;
+			# Filter out tracks with readable:false - not available in this region/subscription.
+			$tracks = Plugins::Deezer::API->cacheTrackMetadata( [grep {
+				$_->{readable} || (defined $_->{id} && $_->{id} < 0)
+			} @$tracks], { album => $album } ) if $tracks;
 
 			$cb->($tracks || []);
 		}, {
