@@ -295,9 +295,13 @@ sub albumTracks {
 			# are listed as readable but fail at playback time with an alternative version;
 			# readable:false means the track is genuinely unavailable and no FALLBACK is
 			# provided. User-uploaded tracks (negative IDs) bypass licensing entirely.
+			my $total = $tracks ? scalar @$tracks : 0;
 			$tracks = Plugins::Deezer::API->cacheTrackMetadata( [grep {
-				$_->{readable} || (defined $_->{id} && $_->{id} < 0)
+				($_->{readable} || (defined $_->{id} && $_->{id} < 0)) &&
+				!$cache->get("deezer_track_norights_$_->{id}")
 			} @$tracks], { album => $album } ) if $tracks;
+			my $kept = $tracks ? scalar @$tracks : 0;
+			$log->info("albumTracks id=$id: $total total, $kept kept after readable+norights filter");
 
 			# If no tracks are playable, remember this so artistAlbums can hide
 			# the album from the listing (24h TTL to recover after subscription changes).
@@ -750,6 +754,15 @@ sub getTrackUrl {
 			$t->{SNG_ID};
 		} @{ $result->{results}->{data} };
 		main::INFOLOG && $log->is_info && $log->info("Track IDs after fallback resolution: @trackIds");
+
+		# Tracks with no rights AND no fallback cannot be streamed by any means.
+		# Cache their IDs so albumTracks can exclude them from future listings.
+		foreach my $track (@{ $result->{results}->{data} || [] }) {
+			if (!($track->{RIGHTS} && %{$track->{RIGHTS}}) && !$track->{FALLBACK}) {
+				$cache->set("deezer_track_norights_$track->{SNG_ID}", 1, 86400);
+				main::INFOLOG && $log->is_info && $log->info("Track $track->{SNG_ID} has no rights and no fallback, marked unplayable");
+			}
+		}
 
 		return $cb->() unless @trackTokens;
 
