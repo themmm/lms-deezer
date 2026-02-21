@@ -288,7 +288,13 @@ sub albumTracks {
 			my $tracks = shift;
 			$tracks = $tracks->{data} if $tracks;
 			# only missing data in album/tracks is the album itself...
-			# Filter out tracks with readable:false - not available in this region/subscription.
+			# Deezer sets readable:false for tracks not licensed in the user's region or
+			# subscription. Queuing them causes error 2002 for every track. Filter them
+			# out here, consistent with playlistTracks. This is independent from the
+			# FALLBACK mechanism in getTrackUrl/flowTracks: FALLBACK handles tracks that
+			# are listed as readable but fail at playback time with an alternative version;
+			# readable:false means the track is genuinely unavailable and no FALLBACK is
+			# provided. User-uploaded tracks (negative IDs) bypass licensing entirely.
 			$tracks = Plugins::Deezer::API->cacheTrackMetadata( [grep {
 				$_->{readable} || (defined $_->{id} && $_->{id} < 0)
 			} @$tracks], { album => $album } ) if $tracks;
