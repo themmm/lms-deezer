@@ -255,7 +255,14 @@ sub _variantB {
 sub _variantD {
 	my ( $client, $results ) = @_;
 
-	my $items = _top($client, $results);
+	my $items = [];
+
+	# Top-Ergebnis gets its own header like the Kategorien, but nothing more to open
+	my @top = @{_top($client, $results)};
+	if (@top) {
+		push @$items, { name => 'Top-Ergebnis', type => 'header-basic', image => 'html/images/favorites.png' };
+		push @$items, map { $_->{name} =~ s/^Top-Ergebnis: //; $_ } @top;
+	}
 
 	foreach my $category ( _categories($client, $results) ) {
 		my ($label, $section, $cat) = @$category;
