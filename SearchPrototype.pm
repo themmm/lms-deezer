@@ -12,6 +12,7 @@ package Plugins::Deezer::SearchPrototype;
 # the Suche menu. State (variant, Zuletzt gesucht) lives in memory only.
 
 use strict;
+use utf8;
 
 use Slim::Utils::Log;
 use Slim::Utils::Strings qw(cstring);
@@ -46,14 +47,24 @@ sub init {
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
 		func => sub {
 			my ( $client, $tags ) = @_;
-			main::INFOLOG && $log->info("PROTOTYPE LMS-Suche provider called for '$tags->{search}'");
+			$log->error("PROTOTYPE LMS-Suche provider called for '$tags->{search}'");
 
-			# name must be exactly "Deezer" for Material's whitelist
+			# name must be exactly "Deezer" for Material's whitelist. A coderef url on
+			# this top-level node makes XMLBrowser skip its session id and mis-resolve
+			# item_id "_<search>.N", so only the children may be lazy.
 			return {
-				name => 'Deezer',
-				type => 'link',
-				url  => \&results,
-				passthrough => [ { query => $tags->{search}, fromLms => 1 } ],
+				name  => 'Deezer',
+				items => [ {
+					name => 'Alle Treffer',
+					type => 'link',
+					url  => \&results,
+					passthrough => [ { query => $tags->{search}, fromLms => 1 } ],
+				}, map { {
+					name => $_->[1]->($client),
+					type => 'link',
+					url  => \&_category,
+					passthrough => [ { query => $tags->{search}, cat => $_->[0], fromLms => 1 } ],
+				} } @CATEGORIES ],
 			};
 		},
 	) );
@@ -110,7 +121,7 @@ sub results {
 	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
 
 	_remember($api->userId, $term);
-	main::INFOLOG && $log->info("PROTOTYPE search '$term', variant $VARIANTS[$variant]->[0], from " . ($params->{fromLms} ? 'LMS-Suche' : 'Suche'));
+	$log->error("PROTOTYPE search '$term', variant $VARIANTS[$variant]->[0], from " . ($params->{fromLms} ? 'LMS-Suche' : 'Suche'));
 
 	$api->gwCall( sub {
 		my $results = $_[0]->{results} || {};
@@ -146,12 +157,43 @@ sub _variantA {
 		my ($label, $section, $cat) = @$category;
 		push @$items, {
 			name  => "$label ($section->{total})",
-			type  => 'outline',
-			items => [ map { _renderEntry($client, $cat, $_) } @{$section->{data}} ],
+			type  => 'link',
+			url   => \&_category,
+			passthrough => [ { query => $results->{QUERY}, cat => $cat } ],
 		};
 	}
 
 	return $items;
+}
+
+# all matches of one Kategorie, paged through search.music (pageSearch caps each section at ~20)
+sub _category {
+	my ( $client, $cb, $args, $params ) = @_;
+
+	my $index = $args->{index} || 0;
+	my $quantity = $args->{quantity} || 50;
+	_remember(Plugins::Deezer::Plugin::getAPIHandler($client)->userId, $params->{query}) if $params->{fromLms} && !$index;
+	$quantity = 100 if $quantity > 100;
+	$log->error("PROTOTYPE category $params->{cat} '$params->{query}' index $index quantity $quantity");
+
+	Plugins::Deezer::Plugin::getAPIHandler($client)->gwCall( sub {
+		my $results = $_[0]->{results} || {};
+		$log->error("PROTOTYPE category $params->{cat}: total $results->{total}, got " . scalar @{$results->{data} || []});
+		$cb->({
+			items  => [ map { _renderEntry($client, $params->{cat}, $_) } @{$results->{data} || []} ],
+			offset => $index,
+			total  => $results->{total},
+		});
+	}, {
+		method => 'search.music',
+		_cacheKey => "proto_searchMusic:$params->{cat}:$index:$quantity:$params->{query}",
+	}, {
+		query => $params->{query},
+		filter => 'ALL',
+		output => $params->{cat},
+		start => $index,
+		nb => $quantity,
+	} );
 }
 
 # B: Top-Ergebnis, then per Kategorie a header, the first 3 matches inline and "alle anzeigen"
