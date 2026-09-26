@@ -121,6 +121,11 @@ sub initPlugin {
 		func  => \&Plugins::Deezer::InfoMenu::albumInfoMenu,
 	) );
 
+	# PROTOTYPE (prototype/search-menu): LMS-Suche provider and Suche variants
+	require Slim::Menu::GlobalSearch;
+	require Plugins::Deezer::SearchPrototype;
+	Plugins::Deezer::SearchPrototype->init;
+
 =comment
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
 		func => sub {
@@ -274,6 +279,12 @@ sub handleFeed {
 	my $userId = getAPIHandler($client)->userId;
 
 	my $items = [ {
+		# PROTOTYPE (prototype/search-menu)
+		name  => cstring($client, 'SEARCH'),
+		image => 'html/images/search.png',
+		type  => 'link',
+		url   => \&Plugins::Deezer::SearchPrototype::menu,
+	},{
 		name => cstring($client, 'HOME'),
 		image => 'plugins/Deezer/html/home.png',
 		type => 'link',
@@ -385,46 +396,6 @@ sub handleFeed {
 		type  => 'link',
 		url   => \&getPodcasts,
 	},{
-		name  => cstring($client, 'SEARCH'),
-		image => 'html/images/search.png',
-		type => 'outline',
-		items => [ {
-			name => cstring($client, 'PLAYLISTS'),
-			type  => 'search',
-			url   => \&search,
-			# image => 'html/images/playlists.png',
-			passthrough => [{ type => 'playlist' }],
-		},{
-			name => cstring($client, 'ARTISTS'),
-			type  => 'search',
-			url   => \&search,
-			# image => 'html/images/artists.png',
-			passthrough => [{ type => 'artist' }],
-		},{
-			name => cstring($client, 'ALBUMS'),
-			type  => 'search',
-			url   => \&search,
-			# image => 'html/images/albums.png',
-			passthrough => [{ type => 'album' }],
-		},{
-			name => cstring($client, 'SONGS'),
-			type  => 'search',
-			url   => \&search,
-			# image => 'html/images/playall.png',
-			passthrough => [{ type => 'track' }],
-		},{
-			name => cstring($client, 'PLUGIN_DEEZER_SMART_RADIO'),
-			type  => 'search',
-			url   => \&search,
-			# image => 'plugins/Deezer/html/smart_radio.png',
-			passthrough => [{ type => 'radio' }],
-		},{
-			name => cstring($client, 'PLUGIN_PODCAST'),
-			type  => 'search',
-			url   => \&search,
-			passthrough => [{ type => 'podcast' }],
-		} ],
-	}, {
 		name => cstring($client, 'PLUGIN_DEEZER_HISTORY'),
 		image => 'plugins/Deezer/html/history.png',
 		type  => 'link',
