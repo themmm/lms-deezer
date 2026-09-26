@@ -27,7 +27,7 @@ my @VARIANTS = (
 	[ 'C', 'Flach wie Spotty' ],
 	[ 'D', 'Wie B, Überschriften mit Symbol' ],
 );
-my $variant = 0;
+my $variant = 3;   # D is the current favourite
 my %recent;
 
 # display order, LMS tokens for generic types, Deezer wording otherwise
