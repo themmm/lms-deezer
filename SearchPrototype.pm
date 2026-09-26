@@ -14,6 +14,8 @@ package Plugins::Deezer::SearchPrototype;
 use strict;
 use utf8;
 
+use Time::HiRes;
+
 use Slim::Utils::Log;
 use Slim::Utils::Strings qw(cstring);
 
@@ -123,10 +125,33 @@ sub results {
 	_remember($api->userId, $term);
 	$log->error("PROTOTYPE search '$term', variant $VARIANTS[$variant]->[0], from " . ($params->{fromLms} ? 'LMS-Suche' : 'Suche'));
 
+	my $started = Time::HiRes::time();
+
 	$api->gwCall( sub {
 		my $results = $_[0]->{results} || {};
 		my $render = ( \&_variantA, \&_variantB, \&_variantC )[$variant];
-		$cb->({ items => $render->($client, $results) });
+
+		# Q45 b: pageSearch totals are capped, fetch the real ones (one search.music call per Kategorie, in parallel)
+		my @cats = grep { $results->{$_} && $results->{$_}->{count} } map { $_->[0] } @CATEGORIES;
+		my $pending = scalar @cats;
+		my $done = sub {
+			$log->error(sprintf("PROTOTYPE search '%s' rendered after %.2fs", $term, Time::HiRes::time() - $started));
+			$cb->({ items => $render->($client, $results) });
+		};
+		return $done->() unless $pending;
+
+		foreach my $cat (@cats) {
+			$api->gwCall( sub {
+				my $total = ($_[0]->{results} || {})->{total};
+				$results->{$cat}->{total} = $total if defined $total;
+				$done->() unless --$pending;
+			}, {
+				method => 'search.music',
+				_cacheKey => "proto_searchTotal:$cat:$term",
+			}, {
+				query => $term, filter => 'ALL', output => $cat, start => 0, nb => 1,
+			} );
+		}
 	}, {
 		method => 'deezer.pageSearch',
 		_cacheKey => 'proto_pageSearch:' . $term,
