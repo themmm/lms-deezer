@@ -257,11 +257,19 @@ sub _variantD {
 
 	my $items = [];
 
-	# Top-Ergebnis gets its own header like the Kategorien, but nothing more to open
-	my @top = @{_top($client, $results)};
+	# Q48 a: Top-Ergebnis is a header like the Kategorien; Material only reacts to
+	# "Mehr" on plugin headers, which opens the page of the top match itself
+	my @top = map { $_->{name} =~ s/^Top-Ergebnis: //; $_ } @{_top($client, $results)};
 	if (@top) {
-		push @$items, { name => 'Top-Ergebnis', type => 'header-basic', image => 'html/images/favorites.png' };
-		push @$items, map { $_->{name} =~ s/^Top-Ergebnis: //; $_ } @top;
+		my $header = { name => 'Top-Ergebnis', type => 'header', image => 'html/images/favorites.png' };
+		if ( ref $top[0]->{url} eq 'CODE' ) {
+			$header->{url} = $top[0]->{url};
+			$header->{passthrough} = $top[0]->{passthrough};
+		}
+		else {
+			$header->{items} = [ @top ];
+		}
+		push @$items, $header, @top;
 	}
 
 	foreach my $category ( _categories($client, $results) ) {
