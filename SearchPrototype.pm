@@ -25,6 +25,7 @@ my @VARIANTS = (
 	[ 'A', 'Kategorien mit Anzahl' ],
 	[ 'B', 'Gruppen mit Vorschau' ],
 	[ 'C', 'Flach wie Spotty' ],
+	[ 'D', 'Wie B, Überschriften mit Symbol' ],
 );
 my $variant = 0;
 my %recent;
@@ -38,6 +39,13 @@ my @CATEGORIES = (
 	[ LIVESTREAM => sub { 'Radiosender' } ],
 	[ SHOW       => sub { 'Podcasts' } ],
 	[ EPISODE    => sub { 'Folgen' } ],
+);
+
+my %ICONS = (
+	ARTIST => 'html/images/artists.png', ALBUM => 'html/images/albums.png',
+	TRACK => 'html/images/playall.png', PLAYLIST => 'html/images/playlists.png',
+	LIVESTREAM => 'html/images/radio.png', SHOW => 'plugins/Deezer/html/podcast.png',
+	EPISODE => 'plugins/Deezer/html/rss.png',
 );
 
 my %TOP_TYPE = (
@@ -129,7 +137,7 @@ sub results {
 
 	$api->gwCall( sub {
 		my $results = $_[0]->{results} || {};
-		my $render = ( \&_variantA, \&_variantB, \&_variantC )[$variant];
+		my $render = ( \&_variantA, \&_variantB, \&_variantC, \&_variantD )[$variant];
 
 		# Q45 b: pageSearch totals are capped, fetch the real ones (one search.music call per Kategorie, in parallel)
 		my @cats = grep { $results->{$_} && $results->{$_}->{count} } map { $_->[0] } @CATEGORIES;
@@ -238,6 +246,29 @@ sub _variantB {
 			type  => 'outline',
 			items => \@rendered,
 		} if @rendered > 3;
+	}
+
+	return $items;
+}
+
+# D: like B, but Material-style headers with icon; tapping the header opens all matches
+sub _variantD {
+	my ( $client, $results ) = @_;
+
+	my $items = _top($client, $results);
+
+	foreach my $category ( _categories($client, $results) ) {
+		my ($label, $section, $cat) = @$category;
+		my @rendered = map { _renderEntry($client, $cat, $_) } @{$section->{data}};
+
+		push @$items, {
+			name  => "$label ($section->{total})",
+			type  => 'header',
+			image => $ICONS{$cat},
+			url   => \&_category,
+			passthrough => [ { query => $results->{QUERY}, cat => $cat } ],
+		};
+		push @$items, @rendered[0 .. ($#rendered < 2 ? $#rendered : 2)];
 	}
 
 	return $items;
