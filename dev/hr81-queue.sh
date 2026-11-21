@@ -27,14 +27,21 @@ echo "fallback-playable tracks missing:  $(wc -w <<<"$miss" | tr -d ' ') of 12 $
 # transition test: play "Lovemachine" (661301) to its end
 start=-1; for ((i = 0; i < n; i++)); do [ "$(rpc $P '["playlist","path",'$i',"?"]' | jq -r .result._path)" = "deezer://661301.flc" ] && start=$i && break; done
 rpc $P '["playlist","index",'$start']' >/dev/null
-last=""; for s in $(seq 1 45); do
+# Lovemachine is 515 s long, about 25-30 s at the fast pace, longer when the stream starts slowly:
+# watch up to 120 s, and 5 s past the first track change, so that a stop on the next track is seen
+last=""; moved=0; for s in $(seq 1 120); do
   sleep 1; S=$(rpc $P '["status","-",1,"tags:a"]')
   line=$(jq -r '.result | "mode=\(.mode) idx=\(.playlist_cur_index // "-") \(.playlist_loop[0].title // "-")"' <<<"$S")
   [ "$line" != "$last" ] && echo "  t+${s}s $line"; last=$line
+  grep -q "mode=stop" <<<"$line" && break
+  [ "$(jq -r '.result.playlist_cur_index // 0' <<<"$S")" -gt "$start" ] && moved=$((moved + 1))
+  [ $moved -ge 5 ] && break
 done
 rpc $P '["stop"]' >/dev/null
 idx=$(jq -r '.result.playlist_cur_index // 0' <<<"$S")
-if grep -q "mode=stop" <<<"$last" || [ "$idx" -le "$start" ]; then echo "transition after Lovemachine:     STOPPED"; red=1; else echo "transition after Lovemachine:     plays on"; fi
+if grep -q "mode=stop" <<<"$last"; then echo "transition after Lovemachine:     STOPPED"; red=1
+elif [ "$idx" -gt "$start" ]; then echo "transition after Lovemachine:     plays on"
+else echo "transition after Lovemachine:     still playing after 120 s"; [ $red = 0 ] && { echo "VERDICT: inconclusive"; exit 2; }; fi
 
 [ $red = 1 ] && { echo "VERDICT: RED"; exit 1; }
 echo "VERDICT: green"
