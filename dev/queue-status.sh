@@ -6,7 +6,7 @@
 #   2. `status` over the whole queue answers with one entry per queued item; a broken entry makes
 #      it fail with "Can't call method "can" on unblessed reference", which also loses cover and title
 #   3. that error does not appear in server.log during the run
-# exit 1 = RED.
+# exit 1 = RED, exit 2 = inconclusive (no answer from LMS or empty queue).
 D=$(cd "$(dirname "$0")" && pwd); P=02:00:00:00:00:08; LOG=$D/config/logs/server.log
 PL=deezer://playlist:13715702701
 rpc() { "$D/rpc.sh" "$@"; }
@@ -15,9 +15,9 @@ OFF=$(wc -c <"$LOG")
 
 rpc $P '["stop"]' >/dev/null; rpc $P '["playlist","clear"]' >/dev/null
 rpc $P '["playlist","add","'$PL'"]' >/dev/null; sleep 5
-n=$(rpc $P '["playlist","tracks","?"]' | jq -r '.result._tracks // 0')
-echo "queue entries: $n"
-[ "$n" -eq 0 ] && { echo "queue is empty, nothing to check"; echo "VERDICT: inconclusive"; exit 2; }
+n=$(rpc $P '["playlist","tracks","?"]' | jq -r '.result._tracks // 0' 2>/dev/null)
+echo "queue entries: ${n:-no answer}"
+[[ "$n" =~ ^[1-9][0-9]*$ ]] || { echo "no answer from LMS or empty queue, nothing to check"; echo "VERDICT: inconclusive"; exit 2; }
 
 tracks=0; other=""
 for ((i = 0; i < n; i++)); do
