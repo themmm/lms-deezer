@@ -1,10 +1,12 @@
 #!/usr/bin/perl
-# Regression check for Playable tracks in playlists (fork #19, ADR 0002): runs the plugin's own
-# Plugins::Deezer::API::Async->playlistTracks with both network adapters stubbed: _get (public API)
-# returns a playlist shaped like "Love Machine", gwCall (gw-light song.getListData) returns RIGHTS
+# Regression check for Playable tracks in playlists and albums (fork #19, #20, ADR 0002): runs the
+# plugin's own Plugins::Deezer::API::Async->playlistTracks and ->albumTracks with both network
+# adapters stubbed: _get (public API) returns a playlist shaped like "Love Machine" and an album
+# with the same tracks, gwCall (gw-light song.getListData) returns RIGHTS
 # and FALLBACK per track, fails, or is never reached for an account without an ARL.
 #   - with a gw answer, a track is listed if it has RIGHTS or a FALLBACK, whatever readable says
-#   - without a gw answer (no ARL, failed request, error answer) readable decides; never an empty list
+#   - without a gw answer (no ARL, failed request, error answer) readable decides for playlists and
+#     every track stays listed for albums; never an empty list
 #   - one gw request covers the whole playlist
 #   - a track that only plays via its FALLBACK shows the FALLBACK's cover, also after the metadata
 #     refresh at playback (cacheTrackMetadata on a /track/{id} answer)
@@ -100,12 +102,22 @@ my %GW_ANSWER = (
 	999002    => undef,
 );
 our @PLAYLIST = @LOVE_MACHINE;
+# album tracks (/album/{id}/tracks): the same mix, but albums never filtered on readable
+my @ALBUM_TRACKS = grep { $_->{id} > 0 && $_->{type} eq 'track' } @LOVE_MACHINE;
+our @ALBUM = @ALBUM_TRACKS;
 
 {
 	no warnings qw(redefine once);
 	*Plugins::Deezer::API::Async::_get = sub {
 		my ($self, $url, $cb) = @_;
-		$cb->($url =~ m{^/playlist/\d+/tracks$} ? { data => [ @PLAYLIST ] } : undef);
+		# a fresh copy per request, like a real answer: the plugin writes into the track hashes
+		my $answer = sub { JSON::PP::decode_json(JSON::PP::encode_json($_[0])) };
+		$cb->(
+			$url =~ m{^/playlist/\d+/tracks$} ? $answer->({ data => \@PLAYLIST }) :
+			$url =~ m{^/album/\d+/tracks$}    ? $answer->({ data => \@ALBUM }) :
+			$url =~ m{^/album/(\d+)$}         ? { id => $1, title => 'Album', md5_image => OWN_COVER } :
+			undef
+		);
 	};
 	# refreshArl: deezer.getUserData, then user.getArl, which hands out the ARL for the account
 	*Plugins::Deezer::API::Async::_ajax = sub {
@@ -138,6 +150,13 @@ my $list = sub {
 	%CACHE = (); @GW_CALLS = (); $GW = $gw{$gw}; @PLAYLIST = @playlist ? @playlist : @LOVE_MACHINE;
 	my $result;
 	eval { $api->playlistTracks(sub { $result = shift }, 13715702701); 1 } or $result = [ { id => "died: $@" } ];
+	return $result || [];
+};
+my $album = sub {
+	my ($api, $gw, @tracks) = @_;
+	%CACHE = (); @GW_CALLS = (); $GW = $gw{$gw}; @ALBUM = @tracks ? @tracks : @ALBUM_TRACKS;
+	my $result;
+	eval { $api->albumTracks(sub { $result = shift }, 248956); 1 } or $result = [ { id => "died: $@" } ];
 	return $result || [];
 };
 my $ids = sub { join ' ', map { $_->{id} } @{ $_[0] } };
@@ -180,6 +199,25 @@ my @big = map { $track->(5000000 + $_, "Track $_", 1) } 1 .. 1200;
 $r = $list->($withArl, 'answers', @big);
 $case->('one gw request for 1200 tracks', @GW_CALLS == 1 && @{ $GW_CALLS[0]{ids} } == 1200 && $GW_CALLS[0]{method} eq 'song.getListData',
 	scalar(@GW_CALLS) . ' requests, ' . join('+', map { scalar @{ $_->{ids} } } @GW_CALLS) . ' ids');
+
+# albums (fork #20): the same check, but without a gw answer every track stays listed
+my $allAlbumTracks = join ' ', map { $_->{id} } @ALBUM_TRACKS;
+
+$r = $album->($withArl, 'answers');
+$case->('album, gw answers: RIGHTS or FALLBACK decide', $ids->($r) eq '661301 145534376 916462 999001 999002', $ids->($r));
+$case->('album, Fallback-only track: Fallback cover', $shows->($cover->($r, 145534376), FB_COVER_1), $cover->($r, 145534376));
+
+$r = $album->($withArl, 'answers', grep { $_->{id} == 2540822 || $_->{id} == 3083376 } @ALBUM_TRACKS);
+$case->('album without a Playable track: empty list', !@$r, $ids->($r));
+
+$r = $album->($withoutArl, 'answers');
+$case->('album without an ARL: every track, no gw request', $ids->($r) eq $allAlbumTracks && !@GW_CALLS,
+	$ids->($r) . ', gw requests: ' . @GW_CALLS);
+
+for my $how (qw(fails error errorList)) {
+	$r = $album->($withArl, $how);
+	$case->("album, gw $how: every track", $ids->($r) eq $allAlbumTracks, $ids->($r));
+}
 
 my $fail = 0;
 for (@cases) {
