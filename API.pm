@@ -14,6 +14,8 @@ use constant BURL => 'https://api.deezer.com';
 use constant GURL => 'https://www.deezer.com/ajax/gw-light.php';
 use constant UURL => 'https://media.deezer.com/v1/get_url';
 use constant IURL => 'https://e-cdns-images.dzcdn.net/images';
+# Deezer's image id for "no image": the MD5 of an empty string
+use constant EMPTY_IMAGE => 'd41d8cd98f00b204e9800998ecf8427e';
 
 use constant DEFAULT_LIMIT => 100;
 use constant MAX_LIMIT => 2000;
@@ -83,7 +85,11 @@ sub getQuality {
 sub getImageUrl {
 	my ($class, $data, $usePlaceholder, $type) = @_;
 
-	if ( my $coverId = $data->{md5_image} || $data->{picture_big} || $data->{picture_medium} || $data->{picture} || (ref $data->{album} && $data->{album}->{cover}) ) {
+	# EMPTY_IMAGE means Deezer has no image; the album's cover URL then leads to that same empty image
+	my $noImage = ($data->{md5_image} || '') eq EMPTY_IMAGE;
+	my ($coverId) = grep { $_ && $_ !~ /\b${\ EMPTY_IMAGE}\b/ } $data->{md5_image}, $data->{picture_big}, $data->{picture_medium}, $data->{picture}, (!$noImage && ref $data->{album} && $data->{album}->{cover});
+
+	if ( $coverId ) {
 
 		return $data->{cover} = $coverId if $coverId =~ /^https?:/;
 
@@ -130,7 +136,8 @@ sub cacheTrackMetadata {
 	return [ map {
 		my $entry = $_;
 		my $oldMeta = $cache->get( 'deezer_meta_' . $entry->{id}) || {};
-		my $icon = $class->getImageUrl($entry, 'usePlaceholder', 'track');
+		# keep a known cover if this entry has none (e.g. a track that only plays via its FALLBACK)
+		my $icon = $class->getImageUrl($entry, undef, 'track') || $oldMeta->{cover} || $class->getImageUrl($entry, 'usePlaceholder', 'track');
 
 		# consolidate metadata in case parsing of stream came first (huh?)
 		my $meta = {
