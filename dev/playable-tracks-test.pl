@@ -8,6 +8,8 @@
 #   - without a gw answer (no ARL, failed request, error answer) readable decides for playlists and
 #     every track stays listed for albums; never an empty list
 #   - one gw request covers the whole playlist
+#   - right after an LMS start (fork #21), a list asked for while refreshArl still fetches the ARL
+#     waits for it, then decides as above; a failed refresh lets readable decide
 #   - a track that only plays via its FALLBACK shows the FALLBACK's cover, also after the metadata
 #     refresh at playback (cacheTrackMetadata on a /track/{id} answer)
 # No LMS needed: the LMS modules API.pm and API/Async.pm load are stubbed.
@@ -29,7 +31,7 @@ use constant DEAD_COVER  => '5f7e2c0b1a9d4e3f8a6b7c5d4e3f2a1b';    # removed ima
 use constant FB_COVER_1  => '38bc36ecd969f166a55a7e630bbaa3aa';
 use constant FB_COVER_2  => 'cff936461f2a3b4c5d6e7f8091a2b3c4';
 
-our (%CACHE, $ACCOUNTS, @GW_CALLS, $GW);
+our (%CACHE, $ACCOUNTS, @GW_CALLS, $GW, $ARL_LATER, @ARL_LATER);
 
 BEGIN {
 	no strict 'refs';
@@ -121,9 +123,13 @@ our $ALBUM_FAILS;
 		);
 	};
 	# refreshArl: deezer.getUserData, then user.getArl, which hands out the ARL for the account
+	# with $ARL_LATER set, user.getArl answers only when the test calls the stored callback, as
+	# right after an LMS start, when the request is still on its way
 	*Plugins::Deezer::API::Async::_ajax = sub {
 		my ($self, $cb, $params) = @_;
-		$cb->({ results => $params->{method} eq 'user.getArl' ? 'fakeArlFromRefresh' : { checkForm => 'x', SESSION_ID => 'y' } });
+		my $answer = { results => $params->{method} eq 'user.getArl' ? 'fakeArlFromRefresh' : { checkForm => 'x', SESSION_ID => 'y' } };
+		return push @ARL_LATER, sub { $cb->($_[0] ? $answer : undef) } if $ARL_LATER && $params->{method} eq 'user.getArl';
+		$cb->($answer);
 	};
 	*Plugins::Deezer::API::Async::gwCall = sub {
 		my ($self, $cb, $args, $content) = @_;
@@ -228,6 +234,43 @@ for my $how (qw(fails error errorList)) {
 	$r = $album->($withArl, $how);
 	$case->("album, gw $how: every track", $ids->($r) eq $allAlbumTracks, $ids->($r));
 }
+
+# right after an LMS start (fork #21): the account has its ARL in the prefs, but refreshArl has not
+# put it into the context yet. A list asked for meanwhile waits for the refresh, then decides.
+my $starting = sub {
+	my ($userId, $open) = @_;
+	%CACHE = (); @GW_CALLS = (); $GW = $gw{answers}; @PLAYLIST = @LOVE_MACHINE; @ALBUM = @ALBUM_TRACKS;
+	$ACCOUNTS->{$userId} = { arl => 'fakeArl' };
+	{ local $ARL_LATER = 1; @ARL_LATER = (); Plugins::Deezer::API::Async::refreshArl($userId) }
+	my ($result, $answered);
+	eval { $open->(Plugins::Deezer::API::Async->new({ userId => $userId }), sub { $result = shift; $answered = 1 }); 1 }
+		or ($result, $answered) = ([ { id => "died: $@" } ], 1);
+	return (\$result, \$answered);
+};
+my $playlist = sub { my ($api, $cb) = @_; $api->playlistTracks($cb, 13715702701) };
+
+my ($res, $answered) = $starting->(1003, $playlist);
+$case->('refresh running: the playlist waits for it', !$$answered, $$answered ? $ids->($$res) : 'waiting');
+$_->(1) for @ARL_LATER;
+$case->('refresh done: RIGHTS or FALLBACK decide', $$answered && $ids->($$res || []) eq '661301 145534376 916462 999001 -42',
+	$$answered ? $ids->($$res || []) : 'still waiting');
+
+($res, $answered) = $starting->(1004, $playlist);
+$_->(0) for @ARL_LATER;
+$case->('refresh fails: readable decides, no gw request', $$answered && $ids->($$res || []) eq $byReadable && !@GW_CALLS,
+	($$answered ? $ids->($$res || []) : 'still waiting') . ', gw requests: ' . @GW_CALLS);
+
+($res, $answered) = $starting->(1005, sub { my ($api, $cb) = @_; $api->albumTracks($cb, 248956) });
+$case->('refresh running: the album waits for it', !$$answered, $$answered ? $ids->($$res) : 'waiting');
+$_->(1) for @ARL_LATER;
+$case->('refresh done: album by RIGHTS or FALLBACK', $$answered && $ids->($$res || []) eq '661301 145534376 916462 999001 999002',
+	$$answered ? $ids->($$res || []) : 'still waiting');
+
+# the refresh every 24 hours: the context already has an ARL, so nothing waits
+($res, $answered) = $starting->(1001, $playlist);
+$case->('later refresh running: the playlist does not wait', $$answered && $ids->($$res || []) eq '661301 145534376 916462 999001 -42',
+	$$answered ? $ids->($$res || []) : 'waiting');
+$_->(1) for @ARL_LATER;
 
 my $fail = 0;
 for (@cases) {
