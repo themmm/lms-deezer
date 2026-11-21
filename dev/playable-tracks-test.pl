@@ -122,6 +122,8 @@ my %gw = (
 	answers => sub { my ($cb, $ids) = @_; $cb->({ results => { data => [ grep { $_ } map { $GW_ANSWER{$_} } @$ids ] } }) },
 	fails   => sub { $_[0]->() },
 	error   => sub { $_[0]->({ error => { VALID_TOKEN_REQUIRED => 'Invalid CSRF token' }, results => {} }) },
+	# PHP encodes an empty array as [], so an error answer can carry a list instead of a hash
+	errorList => sub { $_[0]->({ error => { VALID_TOKEN_REQUIRED => 'Invalid CSRF token' }, results => [] }) },
 );
 
 # --- accounts ----------------------------------------------------------------------------------
@@ -135,7 +137,7 @@ my $list = sub {
 	my ($api, $gw, @playlist) = @_;
 	%CACHE = (); @GW_CALLS = (); $GW = $gw{$gw}; @PLAYLIST = @playlist ? @playlist : @LOVE_MACHINE;
 	my $result;
-	$api->playlistTracks(sub { $result = shift }, 13715702701);
+	eval { $api->playlistTracks(sub { $result = shift }, 13715702701); 1 } or $result = [ { id => "died: $@" } ];
 	return $result || [];
 };
 my $ids = sub { join ' ', map { $_->{id} } @{ $_[0] } };
@@ -157,6 +159,9 @@ $case->('gw request fails: readable decides', $ids->($r) eq $byReadable, $ids->(
 
 $r = $list->($withArl, 'error');
 $case->('gw answers with an error: readable decides', $ids->($r) eq $byReadable, $ids->($r));
+
+$r = $list->($withArl, 'errorList');
+$case->('gw answers with an error and results []: readable decides', $ids->($r) eq $byReadable, $ids->($r));
 
 $r = $list->($withArl, 'fails', grep { $_->{id} != -42 } @LOVE_MACHINE);
 $case->('gw request fails: the list is not empty', scalar @$r, scalar(@$r) . ' tracks');
