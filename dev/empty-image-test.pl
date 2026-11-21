@@ -11,9 +11,11 @@
 use strict;
 use warnings;
 use File::Basename qw(dirname);
+use File::Spec;
 
+# absolute, so that require does not search @INC for a relative path
 my $file;
-BEGIN { $file = shift // dirname(__FILE__) . '/plugin/API.pm' }
+BEGIN { $file = File::Spec->rel2abs(shift // dirname(__FILE__) . '/plugin/API.pm') }
 
 use constant PLACEHOLDER => 'plugins/Deezer/html/deezer.png';
 use constant EMPTY => 'd41d8cd98f00b204e9800998ecf8427e';
