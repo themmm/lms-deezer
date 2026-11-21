@@ -289,10 +289,14 @@ sub albumTracks {
 		$self->_get("/album/$id/tracks", sub {
 			my $tracks = shift;
 			$tracks = $tracks->{data} if $tracks;
-			# only missing data in album/tracks is the album itself...
-			$tracks = Plugins::Deezer::API->cacheTrackMetadata( $tracks, { album => $album } ) if $tracks;
+			return $cb->([]) unless $tracks;
 
-			$cb->($tracks || []);
+			# list only what getTrackUrl can play; without a gw answer keep every track,
+			# as album listings never filtered on the readable flag
+			$self->_playableTracks( sub {
+				# only missing data in album/tracks is the album itself...
+				$cb->( Plugins::Deezer::API->cacheTrackMetadata( $_[0], { album => $album } ) );
+			}, $tracks, sub { 1 } );
 		}, {
 			limit => MAX_LIMIT,
 		} );
@@ -473,14 +477,15 @@ sub playlistTracks {
 # track in the queue stops playback: when it fails as the next track, LMS waits for it to
 # start and stops at the end of the current one. So decide like getTrackUrl does: keep a
 # track if it has RIGHTS or a FALLBACK. Tracks the gw API does not answer for (or all of
-# them, without an ARL) keep the readable flag as before.
+# them, without an ARL) are decided by $unknown, which defaults to the readable flag.
 sub _playableTracks {
-	my ($self, $cb, $tracks) = @_;
+	my ($self, $cb, $tracks, $unknown) = @_;
+	$unknown ||= sub { $_[0]->{readable} };
 
 	my $byReadable = sub {
 		my $filter = shift || {};
 		[ grep {
-			($_->{id} < 0) || ( exists $filter->{$_->{id}} ? $filter->{$_->{id}} : $_->{readable} )
+			($_->{id} < 0) || ( exists $filter->{$_->{id}} ? $filter->{$_->{id}} : $unknown->($_) )
 		} @$tracks ];
 	};
 
