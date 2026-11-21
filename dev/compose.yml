@@ -1,0 +1,18 @@
+name: lms-deezer-dev
+services:
+  lms:
+    image: lmscommunity/lyrionmusicserver:stable
+    container_name: lms-deezer-dev
+    environment:
+      - TZ=Europe/Berlin
+      - HTTP_PORT=9000
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+      - "3483:3483"
+      - "3483:3483/udp"
+    volumes:
+      - ./config:/config
+      - ./music:/music:ro
+      - ./playlist:/playlist
+      - ./plugin:/config/cache/InstalledPlugins/Plugins/Deezer:ro

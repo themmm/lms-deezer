@@ -1,0 +1,6 @@
+# Local LMS test setup (dev/README.md): config/ holds the Deezer ARL
+dev/config/
+dev/dist/
+dev/plugin/
+dev/music/
+dev/playlist/
