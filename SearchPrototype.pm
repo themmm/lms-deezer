@@ -3,13 +3,13 @@ package Plugins::Deezer::SearchPrototype;
 # PROTOTYPE - throwaway code on branch prototype/search-menu, never merge.
 #
 # Answers two questions from the menu redesign:
-#   1. Can the LMS-Suche provider hand back a lazy link node that loads the
+#   1. Can the LMS search provider hand back a lazy link node that loads the
 #      Deezer matches only when tapped?
-#   2. How do Kategorien with counts look in Material and on the Squeezebox
+#   2. How do Categories with counts look in Material and on the Squeezebox
 #      Radio, compared to grouped previews and a Spotty-like flat list?
 #
-# Three variants of the Suche result page, switched via the first entry of
-# the Suche menu. State (variant, Zuletzt gesucht) lives in memory only.
+# Three variants of the Search result page, switched via the first entry of
+# the Search menu. State (variant, Recent searches) lives in memory only.
 
 use strict;
 use utf8;
@@ -22,10 +22,10 @@ use Slim::Utils::Strings qw(cstring);
 my $log = logger('plugin.deezer');
 
 my @VARIANTS = (
-	[ 'A', 'Kategorien mit Anzahl' ],
-	[ 'B', 'Gruppen mit Vorschau' ],
-	[ 'C', 'Flach wie Spotty' ],
-	[ 'D', 'Wie B, Überschriften mit Symbol' ],
+	[ 'A', 'Categories with counts' ],
+	[ 'B', 'Groups with preview' ],
+	[ 'C', 'Flat like Spotty' ],
+	[ 'D', 'Like B, headers with icon' ],
 );
 my $variant = 3;   # D is the current favourite
 my %recent;
@@ -36,9 +36,9 @@ my @CATEGORIES = (
 	[ ALBUM      => sub { cstring($_[0], 'ALBUMS') } ],
 	[ TRACK      => sub { cstring($_[0], 'SONGS') } ],
 	[ PLAYLIST   => sub { cstring($_[0], 'PLAYLISTS') } ],
-	[ LIVESTREAM => sub { 'Radiosender' } ],
+	[ LIVESTREAM => sub { cstring($_[0], 'PLUGIN_DEEZER_RADIO_STATIONS') } ],
 	[ SHOW       => sub { 'Podcasts' } ],
-	[ EPISODE    => sub { 'Folgen' } ],
+	[ EPISODE    => sub { cstring($_[0], 'PLUGIN_DEEZER_EPISODES') } ],
 );
 
 my %ICONS = (
@@ -57,7 +57,7 @@ sub init {
 	Slim::Menu::GlobalSearch->registerInfoProvider( deezer => (
 		func => sub {
 			my ( $client, $tags ) = @_;
-			$log->error("PROTOTYPE LMS-Suche provider called for '$tags->{search}'");
+			$log->error("PROTOTYPE LMS search provider called for '$tags->{search}'");
 
 			# name must be exactly "Deezer" for Material's whitelist. A coderef url on
 			# this top-level node makes XMLBrowser skip its session id and mis-resolve
@@ -65,7 +65,7 @@ sub init {
 			return {
 				name  => 'Deezer',
 				items => [ {
-					name => 'Alle Treffer',
+					name => 'All matches',
 					type => 'link',
 					url  => \&results,
 					passthrough => [ { query => $tags->{search}, fromLms => 1 } ],
@@ -87,12 +87,12 @@ sub menu {
 	my ($key, $label) = @{$VARIANTS[$variant]};
 
 	my $items = [ {
-		name => "PROTOTYP: Variante $key ($label) - antippen zum Wechseln",
+		name => "PROTOTYPE: variant $key ($label) - tap to switch",
 		type => 'link',
 		url  => sub {
 			my ( $client, $cb ) = @_;
 			$variant = ($variant + 1) % @VARIANTS;
-			$cb->({ items => [ { type => 'text', name => "Jetzt: Variante $VARIANTS[$variant]->[0] ($VARIANTS[$variant]->[1])" } ] });
+			$cb->({ items => [ { type => 'text', name => "Now: variant $VARIANTS[$variant]->[0] ($VARIANTS[$variant]->[1])" } ] });
 		},
 	}, {
 		name => cstring($client, 'SEARCH'),
@@ -113,11 +113,11 @@ sub menu {
 	}
 
 	push @$items, {
-		name => 'Zuletzt gesucht: Löschen',
+		name => cstring($client, 'PLUGIN_DEEZER_RECENT_SEARCHES') . ': clear',
 		type => 'link',
 		url  => sub {
 			$recent{$userId} = [];
-			$_[1]->({ items => [ { type => 'text', name => 'Gelöscht' } ] });
+			$_[1]->({ items => [ { type => 'text', name => 'Cleared' } ] });
 		},
 	} if @{$recent{$userId} || []};
 
@@ -131,7 +131,7 @@ sub results {
 	my $api = Plugins::Deezer::Plugin::getAPIHandler($client);
 
 	_remember($api->userId, $term);
-	$log->error("PROTOTYPE search '$term', variant $VARIANTS[$variant]->[0], from " . ($params->{fromLms} ? 'LMS-Suche' : 'Suche'));
+	$log->error("PROTOTYPE search '$term', variant $VARIANTS[$variant]->[0], from " . ($params->{fromLms} ? 'LMS search' : 'Search'));
 
 	my $started = Time::HiRes::time();
 
@@ -139,7 +139,7 @@ sub results {
 		my $results = $_[0]->{results} || {};
 		my $render = ( \&_variantA, \&_variantB, \&_variantC, \&_variantD )[$variant];
 
-		# Q45 b: pageSearch totals are capped, fetch the real ones (one search.music call per Kategorie, in parallel)
+		# Q45 b: pageSearch totals are capped, fetch the real ones (one search.music call per Category, in parallel)
 		my @cats = grep { $results->{$_} && $results->{$_}->{count} } map { $_->[0] } @CATEGORIES;
 		my $pending = scalar @cats;
 		my $done = sub {
@@ -180,7 +180,7 @@ sub _remember {
 	$recent{$userId} = [ splice(@terms, 0, 10) ];
 }
 
-# A: Top-Ergebnis, then one link per Kategorie with its count
+# A: Top result, then one link per Category with its count
 sub _variantA {
 	my ( $client, $results ) = @_;
 
@@ -199,7 +199,7 @@ sub _variantA {
 	return $items;
 }
 
-# all matches of one Kategorie, paged through search.music (pageSearch caps each section at ~20)
+# all matches of one Category, paged through search.music (pageSearch caps each section at ~20)
 sub _category {
 	my ( $client, $cb, $args, $params ) = @_;
 
@@ -229,7 +229,7 @@ sub _category {
 	} );
 }
 
-# B: Top-Ergebnis, then per Kategorie a header, the first 3 matches inline and "alle anzeigen"
+# B: Top result, then per Category a header, the first 3 matches inline and "show all"
 sub _variantB {
 	my ( $client, $results ) = @_;
 
@@ -242,7 +242,7 @@ sub _variantB {
 		push @$items, { name => "--- $label ---", type => 'text' };
 		push @$items, @rendered[0 .. ($#rendered < 2 ? $#rendered : 2)];
 		push @$items, {
-			name  => "Alle $section->{total} $label anzeigen",
+			name  => "Show all $section->{total} $label",
 			type  => 'outline',
 			items => \@rendered,
 		} if @rendered > 3;
@@ -257,11 +257,11 @@ sub _variantD {
 
 	my $items = [];
 
-	# Q48 a: Top-Ergebnis is a header like the Kategorien; Material only reacts to
-	# "Mehr" on plugin headers, which opens the page of the top match itself
-	my @top = map { $_->{name} =~ s/^Top-Ergebnis: //; $_ } @{_top($client, $results)};
+	# Q48 a: Top result is a header like the Categories; Material only reacts to
+	# "More" on plugin headers, which opens the page of the top match itself
+	my @top = @{_top($client, $results, 1)};
 	if (@top) {
-		my $header = { name => 'Top-Ergebnis', type => 'header', image => 'html/images/favorites.png' };
+		my $header = { name => cstring($client, 'PLUGIN_DEEZER_TOP_RESULT'), type => 'header', image => 'html/images/favorites.png' };
 		if ( ref $top[0]->{url} eq 'CODE' ) {
 			$header->{url} = $top[0]->{url};
 			$header->{passthrough} = $top[0]->{passthrough};
@@ -289,7 +289,7 @@ sub _variantD {
 	return $items;
 }
 
-# C: Spotty-like, Kategorie links without counts first, then the Titel inline
+# C: Spotty-like, Category links without counts first, then the tracks inline
 sub _variantC {
 	my ( $client, $results ) = @_;
 
@@ -311,12 +311,14 @@ sub _variantC {
 }
 
 sub _top {
-	my ( $client, $results ) = @_;
+	my ( $client, $results, $noPrefix ) = @_;
+
+	my $prefix = cstring($client, 'PLUGIN_DEEZER_TOP_RESULT') . ': ';
 
 	return [ map {
 		my $cat = $TOP_TYPE{$_->{__TYPE__}};
 		my $item = $cat ? _renderEntry($client, $cat, $_) : undef;
-		$item->{name} = 'Top-Ergebnis: ' . ($item->{name} || $item->{title}) if $item;
+		$item->{name} = $prefix . ($item->{name} || $item->{title}) if $item && !$noPrefix;
 		$item ? $item : ();
 	} @{$results->{TOP_RESULT} || []} ];
 }

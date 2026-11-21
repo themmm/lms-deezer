@@ -121,7 +121,7 @@ sub initPlugin {
 		func  => \&Plugins::Deezer::InfoMenu::albumInfoMenu,
 	) );
 
-	# PROTOTYPE (prototype/search-menu): LMS-Suche provider and Suche variants
+	# PROTOTYPE (prototype/search-menu): LMS search provider and Search variants
 	require Slim::Menu::GlobalSearch;
 	require Plugins::Deezer::SearchPrototype;
 	Plugins::Deezer::SearchPrototype->init;
