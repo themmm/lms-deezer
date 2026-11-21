@@ -496,7 +496,20 @@ sub _playableTracks {
 			$_->{SNG_ID} => ( ($_->{RIGHTS} && %{$_->{RIGHTS}}) || $_->{FALLBACK} ) ? 1 : 0
 		} @$data;
 
+		# a track that only plays via its FALLBACK may have no cover of its own: use the
+		# cover of the version that is actually played
+		my %fallbackCover = map {
+			$_->{SNG_ID} => $_->{FALLBACK}->{ALB_PICTURE}
+		} grep {
+			!($_->{RIGHTS} && %{$_->{RIGHTS}}) && ref $_->{FALLBACK} && $_->{FALLBACK}->{ALB_PICTURE}
+		} @$data;
+
 		my $kept = $byReadable->(\%playable);
+
+		foreach (@$kept) {
+			my $cover = $fallbackCover{$_->{id}} || next;
+			$_->{md5_image} = $cover if !$_->{md5_image} || $_->{md5_image} eq Plugins::Deezer::API::EMPTY_IMAGE;
+		}
 		main::INFOLOG && $log->is_info && $log->info(sprintf("%d of %d tracks playable (rights or fallback), %d answered by gw",
 			scalar @$kept, scalar @$tracks, scalar keys %playable));
 
