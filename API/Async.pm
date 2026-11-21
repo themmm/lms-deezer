@@ -44,6 +44,8 @@ my $prefs = preferences('plugin.deezer');
 
 my %apiClients;
 my %contexts;
+# per account, while refreshArl runs: what waits for the ARL it puts into %contexts
+my %arlWaiters;
 my $tzOffset = tz_local_offset();
 
 use constant PAGE_SIZE => 50;
@@ -79,24 +81,29 @@ sub refreshArl {
 
 	main::INFOLOG && $log->is_info && $log->info("Refreshing Arl for user $userId");
 	Slim::Utils::Timers::killTimers($userId, \&refreshArl);
-	
+	$arlWaiters{$userId} ||= [];
+
 	__PACKAGE__->_ajax( sub {
 		my $result = shift;
 		
 		__PACKAGE__->_ajax( sub {
 			my $result = shift;
+			my $waiters = delete $arlWaiters{$userId} || [];
 
 			# stop refreshing if profile has been destroyed meanwhile
-			return unless $profile->{arl};
+			if ($profile->{arl}) {
+				if ( $result && $result->{results} ) {
+					$profile->{arl} = $contexts{$userId}->{arl} = $result->{results};
+					$prefs->set('accounts', $accounts);
+				}
 
-			if ( $result && $result->{results} ) {
-				$profile->{arl} = $contexts{$userId}->{arl} = $result->{results};
-				$prefs->set('accounts', $accounts);
+				# (re)starting refresh timer
+				main::INFOLOG && $log->is_info && $log->info("Refreshed Arl for user $userId");
+				Slim::Utils::Timers::setTimer($userId, time() + 24 * 3600, \&refreshArl, $userId);
 			}
-			
-			# (re)starting refresh timer
-			main::INFOLOG && $log->is_info && $log->info("Refreshed Arl for user $userId");
-			Slim::Utils::Timers::setTimer($userId, time() + 24 * 3600, \&refreshArl, $userId);
+
+			# with or without a new ARL: whatever waited decides now
+			$_->() foreach @$waiters;
 		}, {
 			method => 'user.getArl',
 			api_token => $result->{results}->{checkForm},
@@ -506,6 +513,14 @@ sub _playableTracks {
 
 	my @ids = map { $_->{id} } grep { $_->{id} > 0 } @$tracks;
 	my $context = $contexts{$self->userId};
+
+	# right after an LMS start the context gets its ARL only once refreshArl has finished
+	if ( @ids && !($context && $context->{arl}) && (my $waiters = $arlWaiters{$self->userId}) ) {
+		main::INFOLOG && $log->is_info && $log->info("Waiting for the ARL of user " . $self->userId);
+		push @$waiters, sub { $self->_playableTracks($cb, $tracks, $unknown) };
+		return;
+	}
+
 	return $cb->($byReadable->()) unless @ids && $context && $context->{arl};
 
 	$self->gwCall( sub {
