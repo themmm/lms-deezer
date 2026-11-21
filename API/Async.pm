@@ -102,8 +102,11 @@ sub refreshArl {
 				Slim::Utils::Timers::setTimer($userId, time() + 24 * 3600, \&refreshArl, $userId);
 			}
 
-			# with or without a new ARL: whatever waited decides now
-			$_->() foreach @$waiters;
+			# with or without a new ARL: whatever waited decides now, each on its own
+			foreach my $waiter (@$waiters) {
+				eval { $waiter->() };
+				$log->error("Waiting for the ARL failed: $@") if $@;
+			}
 		}, {
 			method => 'user.getArl',
 			api_token => $result->{results}->{checkForm},
