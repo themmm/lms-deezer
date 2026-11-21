@@ -1,7 +1,9 @@
 #!/bin/bash
 # Feedback loop for the startup window (fork #21). Right after an LMS start the account has no ARL
 # in its context until refreshArl has finished (about 1 s after the web server is up). A list
-# built in that window must still be filtered by rights and Fallback, not by readable.
+# built in that window falls back to readable (albums: every track). That is accepted (#21 is
+# wontfix), so the in-window results are only reported. The verdict is on the results after the
+# window: a readable result there means a fallback outlived the window, e.g. through the cache.
 # Each run restarts LMS, then as soon as the test player is back opens playlist "Love Machine"
 # twice at once: in the menu (deezer items) and by queueing its URL. Each result is classified:
 #   playable  the 12 Fallback-only tracks are in, the 2 tracks without rights and Fallback are out
@@ -52,7 +54,7 @@ queue() {
 }
 ts() { grep -oE '^\[[0-9: .-]+\]' | tr -d '[]'; }
 
-red=0; inside_total=0; runs_done=0
+red=0; inside_total=0; runs_done=0; fell_back=0
 rpc $P '["stop"]' >/dev/null
 for run in $(seq 1 "$RUNS"); do
   OFF=$(wc -c <"$LOG")
@@ -79,7 +81,7 @@ for run in $(seq 1 "$RUNS"); do
   echo "run $run: web up ${init#* }, ARL ${arl#* }, requests inside the window: $inside of $(grep -c . <<<"$asks")"
   for what in browse queue; do
     c=$(classify "$TMP/$what"); printf "  %-6s in the window:    %s\n" "$what" "$c"
-    [[ "$c" == playable* ]] || red=1
+    [[ "$c" == readable* ]] && fell_back=$((fell_back + 1))
   done
 
   # after the window: a readable result must not outlive it
@@ -91,7 +93,7 @@ for run in $(seq 1 "$RUNS"); do
 done
 rpc $P '["playlist","clear"]' >/dev/null
 
-echo "runs: $runs_done, requests inside the window: $inside_total"
+echo "runs: $runs_done, requests inside the window: $inside_total, fell back to readable there: $fell_back (accepted, #21)"
 [ $red = 1 ] && { echo "VERDICT: RED"; exit 1; }
 [ "$inside_total" = 0 ] && { echo "VERDICT: inconclusive (no request reached the plugin before the ARL)"; exit 2; }
 echo "VERDICT: green"
