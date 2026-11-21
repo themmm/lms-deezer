@@ -49,6 +49,7 @@ Each loop prints its evidence and ends with `VERDICT: green` (exit 0) or `VERDIC
 | Loop | Checks | Notes |
 |---|---|---|
 | `./hr81-queue.sh` | Playlist "Love Machine": tracks without rights and Fallback are left out, the 12 Fallback-only tracks are in, playback goes on after "Lovemachine" | needs `PACE=6000000 ./player.sh` |
+| `./queue-status.sh` | Playlist "Love Machine" added by URL: every queue entry is a Deezer track (no sort link), `status` over the whole queue answers with a title for each, no "unblessed reference" error in `server.log` (fork #14) | |
 | `./hr82-album.sh` | Boney M. album 108288 queues 14 tracks, Phil Carmen 248956 queues 0 | |
 | `./hr81-cover.sh` | Cover of 4 Fallback-only tracks before, during and after playback, each cover id checked on the CDN | |
 | `./hr9-loop.sh [DEBUG\|INFO\|WARN]` | Restarts LMS, re-adds the account, plays a track and Flow, then counts ARLs and session tokens in `server.log`. Prints counts and log locations, never values | leaves that log level in `config/prefs/log.conf` |
