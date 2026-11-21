@@ -11,4 +11,4 @@ Playlists and albums list only Playable tracks, and the plugin decides that from
 ## Consequences
 
 - Without a gw answer (no ARL in the Account's context yet, or a failed request) playlists fall back to `readable` and albums keep every track, so a gw outage never empties a list.
-- A track that plays only through its Fallback shows the Fallback's cover when it has no image of its own.
+- A track that plays only through its Fallback always shows the Fallback's cover, because its own image id is often empty or points to a removed image. Title, artist and album still come from the original track.
