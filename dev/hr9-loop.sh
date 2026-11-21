@@ -3,7 +3,8 @@
 # Sets plugin.deezer to <level> in log.conf, restarts LMS (new session + refreshArl at startup),
 # exercises the settings page (bad ARL, then re-adding the real one), plays a track and Flow,
 # then counts secrets in the log written since the restart. Prints counts and log locations, never values.
-# usage: hr9-loop.sh [DEBUG|INFO|WARN|ERROR]     exit 1 = RED (an ARL or ARL-shaped string is in the log)
+# usage: hr9-loop.sh [DEBUG|INFO|WARN|ERROR]     exit 1 = RED (an ARL or ARL-shaped string is in the log),
+#        exit 2 = inconclusive (network errors kept the gw paths from running)
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 LEVEL=${1:-DEBUG}
@@ -16,10 +17,22 @@ rpc() { "$D/rpc.sh" "$@"; }
 
 arls
 sed -i '' -E "s/^(log4perl\.logger\.plugin\.deezer = ).*/\1$LEVEL/" "$D/config/prefs/log.conf"
-OFF=$(wc -c <"$LOG")
-docker restart lms-deezer-dev >/dev/null
-for _ in $(seq 1 60); do rpc "" '["serverstatus",0,0]' >/dev/null 2>&1 && break; sleep 2; done
-for _ in $(seq 1 30); do rpc "" '["players",0,9]' | jq -e --arg p $P '.result.players_loop[]?|select(.playerid==$p)' >/dev/null && break; sleep 1; done
+# A start whose refreshArl hits a network error (e.g. DNS not ready yet) leaves the account without
+# an ARL, and the gw calls then loop (fork #6). Such a run never reaches the code that logs secrets
+# and would look green, so retry the start. "Refreshed Arl" is INFO and invisible at WARN; the
+# Async "Error:" line is WARN, so it is checked instead.
+for attempt in 1 2 3; do
+  OFF=$(wc -c <"$LOG"); INODE=$(stat -f %i "$LOG")
+  docker restart lms-deezer-dev >/dev/null
+  for _ in $(seq 1 60); do rpc "" '["serverstatus",0,0]' >/dev/null 2>&1 && break; sleep 2; done
+  for _ in $(seq 1 30); do rpc "" '["players",0,9]' | jq -e --arg p $P '.result.players_loop[]?|select(.playerid==$p)' >/dev/null && break; sleep 1; done
+  # LMS rotates a large server.log to server.log.0 at startup; the new file then starts with this run
+  [ "$(stat -f %i "$LOG")" != "$INODE" ] && OFF=0
+  sleep 8
+  tail -c +$((OFF + 1)) "$LOG" | grep -q "API::Async.*Error:" || break
+  echo "attempt $attempt: start hit a network error, restarting"
+  [ $attempt -eq 3 ] && { docker stop lms-deezer-dev >/dev/null; echo "VERDICT: inconclusive (LMS did not start cleanly, stopped)"; exit 2; }
+done
 
 # settings page: a wrong ARL (192 hex chars, not a real account), then the real one again
 FAKE=$(printf 'f%.0s' $(seq 1 192))
@@ -50,4 +63,7 @@ count "api_token / checkForm value" "(api_token=|checkForm[\"']?[[:space:]]*(=>|
 count "signed stream URL (hdnea=)" 'hdnea='
 
 if [ $((n_real + n_fake + n_hex)) -gt 0 ]; then echo "VERDICT: RED (ARL in server.log)"; exit 1; fi
+if ! grep -q 'Plugins::Deezer' "$NEW"; then echo "VERDICT: inconclusive (no plugin lines in the log since the restart)"; exit 2; fi
+n_err=$(grep -c "API::Async.*Error:" "$NEW")
+if [ "$n_err" -gt 0 ]; then echo "VERDICT: inconclusive ($n_err Async network errors during the run, gw paths not exercised)"; exit 2; fi
 echo "VERDICT: green (no ARL in server.log)"
