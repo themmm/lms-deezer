@@ -162,8 +162,13 @@ sub track {
 	$self->_get("/track/$id", sub {
 		my $track = shift;
 
+		# a failed lookup (e.g. uploaded tracks with negative ids get an OAuthException) has no
+		# id: caching it would store junk under an empty key and the callback would send a
+		# 'newmetadata' notification, making clients ask again in an endless loop
+		return $cb->(undef) if !$track || $track->{error};
+
 		# even if cachable data are missing, we *want* to cache
-		($track) = @{Plugins::Deezer::API->cacheTrackMetadata( [$track], { cache => 1 } )} if $track;
+		($track) = @{Plugins::Deezer::API->cacheTrackMetadata( [$track], { cache => 1 } )};
 		$cb->($track);
 	});
 }
@@ -839,6 +844,11 @@ sub _getProviders {
 		cipher => 'BF_CBC_STRIPE',
 		format => 'FLAC',
 	} if ($quality eq 'LOSSLESS');
+	
+	unshift @$formats,
+		{ cipher => 'BF_CBC_STRIPE', format => 'FLAC_24' },
+		{ cipher => 'BF_CBC_STRIPE', format => 'FLAC' } 
+	if ($quality eq 'HIRES');
 
 	my $content = encode_json( {
 		track_tokens => $trackTokens,
