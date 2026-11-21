@@ -31,7 +31,7 @@ jq -r '.result | "mode=\(.mode) time=\(.time // "-")",
    "type=\(.type // "-") bitrate=\(.bitrate // "-") samplerate=\(.samplerate // "-") samplesize=\(.samplesize // "-") remote=\(.remote // "-")")' <<<"$S"
 echo "--- server.log (plugin lines)"
 tail -c +$((OFF + 1)) "$LOG" | grep -E "DEBUG-hr8|Deezer|deezer" | grep -vE "Getting https?://|Returning cached" \
-  | sed -E -e 's/(arl|sid|token|license_token|api_token|hdnea)=[^&" ]+/\1=<REDACTED>/gi' -e 's/(for ARL) [0-9a-fA-F]+/\1 <REDACTED>/' | cut -c1-260
+  | sed -E -e 's/(arl|sid|token|license_token|api_token|hdnea)=[^&" ]+/\1=<REDACTED>/gi' -e 's/(for ARL) [0-9a-fA-F]+/\1 <REDACTED>/' -e 's/[0-9a-fA-F]{192,}/<REDACTED>/g' | cut -c1-260
 
 T=$(jq -r '.result.playlist_loop[0].type // ""' <<<"$S")
 BR=$(jq -r '.result.playlist_loop[0].bitrate // ""' <<<"$S" | grep -oE '^[0-9]+')
