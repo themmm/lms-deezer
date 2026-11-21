@@ -51,12 +51,7 @@ sub albumTracks {
 	my ($class, $userId, $id, $album) = @_;
 
 	my $tracks = $class->_get("/album/$id/tracks", $userId);
-	# Filter out readable:false tracks (not licensed for this region/subscription)
-	# to prevent them from being written to LMS's track database during indexing.
-	# See the same filter in Async::albumTracks for the full rationale.
-	$tracks = Plugins::Deezer::API->cacheTrackMetadata( [grep {
-		$_->{readable} || (defined $_->{id} && $_->{id} < 0)
-	} @{$tracks->{data} || []}], { album => $album } ) if $tracks;
+	$tracks = Plugins::Deezer::API->cacheTrackMetadata($tracks->{data}, { album => $album } ) if $tracks;
 
 	return $tracks;
 }
