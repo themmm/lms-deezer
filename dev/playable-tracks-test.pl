@@ -105,6 +105,7 @@ our @PLAYLIST = @LOVE_MACHINE;
 # album tracks (/album/{id}/tracks): the same mix, but albums never filtered on readable
 my @ALBUM_TRACKS = grep { $_->{id} > 0 && $_->{type} eq 'track' } @LOVE_MACHINE;
 our @ALBUM = @ALBUM_TRACKS;
+our $ALBUM_FAILS;
 
 {
 	no warnings qw(redefine once);
@@ -114,7 +115,7 @@ our @ALBUM = @ALBUM_TRACKS;
 		my $answer = sub { JSON::PP::decode_json(JSON::PP::encode_json($_[0])) };
 		$cb->(
 			$url =~ m{^/playlist/\d+/tracks$} ? $answer->({ data => \@PLAYLIST }) :
-			$url =~ m{^/album/\d+/tracks$}    ? $answer->({ data => \@ALBUM }) :
+			$url =~ m{^/album/\d+/tracks$}    ? ($ALBUM_FAILS ? undef : $answer->({ data => \@ALBUM })) :
 			$url =~ m{^/album/(\d+)$}         ? { id => $1, title => 'Album', md5_image => OWN_COVER } :
 			undef
 		);
@@ -155,9 +156,9 @@ my $list = sub {
 my $album = sub {
 	my ($api, $gw, @tracks) = @_;
 	%CACHE = (); @GW_CALLS = (); $GW = $gw{$gw}; @ALBUM = @tracks ? @tracks : @ALBUM_TRACKS;
-	my $result;
-	eval { $api->albumTracks(sub { $result = shift }, 248956); 1 } or $result = [ { id => "died: $@" } ];
-	return $result || [];
+	my ($result, $total);
+	eval { $api->albumTracks(sub { ($result, $total) = @_ }, 248956); 1 } or $result = [ { id => "died: $@" } ];
+	return wantarray ? ($result || [], $total) : $result || [];
 };
 my $ids = sub { join ' ', map { $_->{id} } @{ $_[0] } };
 my $cover = sub { my ($items, $id) = @_; my ($t) = grep { $_->{id} == $id } @$items; $t ? $t->{cover} // '' : 'missing' };
@@ -207,8 +208,17 @@ $r = $album->($withArl, 'answers');
 $case->('album, gw answers: RIGHTS or FALLBACK decide', $ids->($r) eq '661301 145534376 916462 999001 999002', $ids->($r));
 $case->('album, Fallback-only track: Fallback cover', $shows->($cover->($r, 145534376), FB_COVER_1), $cover->($r, 145534376));
 
-$r = $album->($withArl, 'answers', grep { $_->{id} == 2540822 || $_->{id} == 3083376 } @ALBUM_TRACKS);
+# getAlbum says "no playable tracks" only for an album that has tracks, not for a failed request
+my $total;
+($r, $total) = $album->($withArl, 'answers', grep { $_->{id} == 2540822 || $_->{id} == 3083376 } @ALBUM_TRACKS);
 $case->('album without a Playable track: empty list', !@$r, $ids->($r));
+$case->('album without a Playable track: reports its 2 tracks', ($total // '') eq '2', $total // 'undef');
+
+{
+	local $ALBUM_FAILS = 1;
+	($r, $total) = $album->($withArl, 'answers');
+	$case->('album request fails: empty list, no tracks reported', !@$r && !$total, $ids->($r) . ', total ' . ($total // 'undef'));
+}
 
 $r = $album->($withoutArl, 'answers');
 $case->('album without an ARL: every track, no gw request', $ids->($r) eq $allAlbumTracks && !@GW_CALLS,
