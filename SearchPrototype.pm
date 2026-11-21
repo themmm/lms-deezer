@@ -36,7 +36,7 @@ my @CATEGORIES = (
 	[ ALBUM      => sub { cstring($_[0], 'ALBUMS') } ],
 	[ TRACK      => sub { cstring($_[0], 'SONGS') } ],
 	[ PLAYLIST   => sub { cstring($_[0], 'PLAYLISTS') } ],
-	[ LIVESTREAM => sub { cstring($_[0], 'PLUGIN_DEEZER_RADIO_STATIONS') } ],
+	[ LIVESTREAM => sub { cstring($_[0], 'RADIO') } ],
 	[ SHOW       => sub { 'Podcasts' } ],
 	[ EPISODE    => sub { cstring($_[0], 'PLUGIN_DEEZER_EPISODES') } ],
 );

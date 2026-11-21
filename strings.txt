@@ -469,7 +469,7 @@ PLUGIN_DEEZER_LIVE_PARAMS_DESC
 
 PLUGIN_DEEZER_CHANNELS
 	DA	Kanaler
-	DE	Channels
+	DE	Kanäle
 	EN	Channels
 	FR	Canaux
 	HU	Channels
@@ -517,7 +517,7 @@ PLUGIN_DEEZER_DISLIKE_ARTIST
 
 PLUGIN_DEEZER_EXPLORE
 	DA	Udforske
-	DE	Entdecken
+	DE	Erkunden
 	EN	Explore
 	FR	Explorer
 	HU	Felfedezés
@@ -525,7 +525,7 @@ PLUGIN_DEEZER_EXPLORE
 
 PLUGIN_DEEZER_HISTORY
 	DA	Historik for lytning
-	DE	Gehörte Songs
+	DE	Hörverlauf
 	EN	Listening History
 	FR	Historique d'écoute
 	HU	Lejátszás előzmények
@@ -533,7 +533,7 @@ PLUGIN_DEEZER_HISTORY
 
 PLUGIN_DEEZER_PERSONAL
 	DA	Personligt bibliotek
-	DE	Meine MP3s
+	DE	Persönliche Sammlung
 	EN	Personal library
 	FR	Bibliothèque personnelle
 	HU	Személyes könyvtár
@@ -541,7 +541,7 @@ PLUGIN_DEEZER_PERSONAL
 
 PLUGIN_DEEZER_COLLECTION
 	DA	Mit bibliotek
-	DE	Bibliothek
+	DE	Meine Sammlung
 	EN	My collection
 	FR	Ma collection
 	HU	Saját gyűjtemény
@@ -590,7 +590,3 @@ PLUGIN_DEEZER_TOP_RESULT
 PLUGIN_DEEZER_RECENT_SEARCHES
 	DE	Zuletzt gesucht
 	EN	Recent searches
-
-PLUGIN_DEEZER_RADIO_STATIONS
-	DE	Radiosender
-	EN	Radio stations

@@ -158,7 +158,7 @@ sub search {
 		my $items = [];
 
 		push @$items, {
-			name => cstring($client, 'PLUGIN_DEEZER_RADIO_STATIONS'),
+			name => cstring($client, 'RADIO'),
 			image => 'plugins/Deezer/html/radio.png',
 			type => 'outline',
 			items => _renderItems($client, $results->{LIVESTREAM}->{data}),

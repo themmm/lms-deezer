@@ -1,6 +1,6 @@
 # Deezer for LMS
 
-An LMS plugin that lets players browse, search and stream the Deezer catalog through a Deezer account. Deezer-specific concepts use the wording of Deezer's own web player; generic catalog types (artists, albums, tracks, playlists) use LMS's own words, so the plugin reads as one with the rest of LMS. Terms here are English; the localized UI labels live in `strings.txt`.
+An LMS plugin that lets players browse, search and stream the Deezer catalog through a Deezer account. Where upstream (philippe44/lms-deezer) already has a label for a concept, its wording wins, in every language; generic catalog types (artists, albums, tracks, playlists) use LMS's own words, so the plugin reads as one with the rest of LMS. Only concepts the fork adds get wording of their own, following Deezer's web player. Terms here are English; the localized UI labels live in `strings.txt`.
 
 ## Language
 
@@ -36,8 +36,8 @@ An endless track sequence Deezer generates from a seed such as an artist, a trac
 _Avoid_: Smart Radio, radio
 
 **Radio station**:
-A live broadcast station streamed through Deezer.
-_Avoid_: radio, livestream, Smart Radio
+A live broadcast station streamed through Deezer. The menu labels them with LMS's own "Radio".
+_Avoid_: livestream, Smart Radio
 
 **Channel**:
 An editorial Deezer page on a theme (a genre, an occasion, podcasts), which groups playlists, albums and shows.
@@ -53,9 +53,9 @@ _Avoid_: main menu, start page
 The menu area for browsing the Deezer catalog beyond the Account's own content: charts, genres, Mixes, Radio stations, podcasts and Deezer's Channels.
 _Avoid_: discover, browse
 
-**Library**:
-The menu area holding an Account's own content: favourites, My MP3s and Listening history.
-_Avoid_: favourites, my music, collection
+**My collection**:
+The menu area holding an Account's own content: favourites, Personal library and Listening history.
+_Avoid_: library, favourites, my music
 
 **Listening history**:
 The tracks an Account has recently played on Deezer.
