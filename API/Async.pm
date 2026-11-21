@@ -998,7 +998,9 @@ sub _ajax {
 	my ($self, $cb, $params, $content) = @_;
 
 	my $cookies = delete $params->{_cookies};
-	my $cacheKey = 'deezer_ajax_' . delete $params->{_cacheKey} if $params->{_cacheKey};
+	# never "my ... if": without a key, the callback below would share the variable with other
+	# requests on their way and could cache this answer under their key (fork #21)
+	my $cacheKey = $params->{_cacheKey} ? 'deezer_ajax_' . delete $params->{_cacheKey} : undef;
 	my $ttl = delete $params->{_ttl} || USER_CONTENT_TTL;
 	my %headers = ( 'Content-Type' => delete $params->{_contentType} || 'application/x-www-form-urlencoded' );
 	$headers{Cookie} = join '; ', map { "$_=$cookies->{$_}" } keys %$cookies if $cookies;

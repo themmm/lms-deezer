@@ -109,6 +109,18 @@ my @ALBUM_TRACKS = grep { $_->{id} > 0 && $_->{type} eq 'track' } @LOVE_MACHINE;
 our @ALBUM = @ALBUM_TRACKS;
 our $ALBUM_FAILS;
 
+# the plugin's own _ajax, before it is stubbed below; its HTTP requests answer when the test says so
+my $realAjax = \&Plugins::Deezer::API::Async::_ajax;
+our @HTTP_PENDING;
+{
+	no strict 'refs'; no warnings 'once';
+	*{'Slim::Networking::SimpleAsyncHTTP::new'} = sub { my (undef, $ok) = @_; bless { ok => $ok }, 'FakeHTTP' };
+	*{"FakeHTTP::$_"} = sub { push @HTTP_PENDING, $_[0] } for qw(get post);
+	*{'FakeHTTP::answer'} = sub { $_[0]->{ok}->(bless { content => JSON::PP::encode_json($_[1]) }, 'FakeResponse') };
+	*{'FakeResponse::content'} = sub { $_[0]->{content} };
+	*{'Slim::Networking::Async::HTTP::cookie_jar'} = sub { undef };
+}
+
 {
 	no warnings qw(redefine once);
 	*Plugins::Deezer::API::Async::_get = sub {
@@ -271,6 +283,20 @@ $case->('refresh done: album by RIGHTS or FALLBACK', $$answered && $ids->($$res 
 $case->('later refresh running: the playlist does not wait', $$answered && $ids->($$res || []) eq '661301 145534376 916462 999001 -42',
 	$$answered ? $ids->($$res || []) : 'waiting');
 $_->(1) for @ARL_LATER;
+
+# _ajax caches an answer only under its own request's key (fork #21): while a request without a key
+# (deezer.getUserData for a session) is on its way, a keyed one (song.getListData) starts and ends
+{
+	%CACHE = (); @HTTP_PENDING = ();
+	my $api = Plugins::Deezer::API::Async->new({ userId => 1001 });
+	$realAjax->($api, sub {}, { method => 'deezer.getUserData' });
+	$realAjax->($api, sub {}, { method => 'song.getListData', _cacheKey => 'playable_test', _ttl => 60 });
+	$HTTP_PENDING[1]->answer({ results => { data => [ { SNG_ID => '661301' } ] } });
+	$HTTP_PENDING[0]->answer({ results => { SESSION_ID => 'session' } });
+	my $cached = $CACHE{deezer_ajax_playable_test};
+	my $has = $cached && ref $cached->{results} eq 'HASH' && join(',', sort keys %{ $cached->{results} });
+	$case->('_ajax: an answer without a key is not cached under another key', ($has || '') eq 'data', $has || 'nothing cached');
+}
 
 my $fail = 0;
 for (@cases) {
