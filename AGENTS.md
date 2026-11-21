@@ -6,6 +6,14 @@ Deezer plugin for Lyrion Music Server (LMS), written in Perl with no build step.
 
 Everything in the repo is English: code, comments, log messages, docs, `GLOSSARY.md`, ADRs, commit messages. The only exception is localized UI text, which lives in `strings.txt`; user-visible labels go there as keys, never as hard-coded strings in a module. Conversation with the user may be in German; that never carries over into files.
 
+## Upstream
+
+This repo is a fork of `philippe44/lms-deezer` (remote `upstream`); fork features are meant to go back upstream as pull requests.
+
+- Where upstream already has a label for a concept, use upstream's wording in every language. Never change the text of an existing upstream key in `strings.txt`; that only creates merge conflicts and a second wording for the same thing.
+- Keys for fork-only features are fine. They travel in the upstream pull request that brings that feature.
+- Missing translations of upstream keys go upstream too, but collected into one pull request, never one key at a time, so the maintainer is not flooded with pull requests.
+
 ## Commits
 
 Commit after every meaningful change to source files. Message in English, `type: short description` (`fix:`, `feat:`, `refactor:`, `docs:`), plus a body explaining why for non-trivial changes. Write the message to a temp file and run `GIT_EDITOR=true git commit -F <tempfile>`.
