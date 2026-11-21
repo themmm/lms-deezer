@@ -15,6 +15,12 @@ red=0
 rpc $P '["stop"]' >/dev/null; rpc $P '["playlist","clear"]' >/dev/null
 rpc $P '["playlist","add","deezer://playlist:13715702701"]' >/dev/null; sleep 5
 n=$(rpc $P '["playlist","tracks","?"]' | jq -r '.result._tracks')
+# code without upstream PR #95 queues the playlist's sort link at index 0, and status fails while it
+# is the current entry; drop such entries so this loop measures covers only
+for ((i = n - 1; i >= 0; i--)); do
+  [[ "$(rpc $P '["playlist","path",'$i',"?"]' | jq -r '.result._path // ""')" == deezer://* ]] || rpc $P '["playlist","delete",'$i']' >/dev/null
+done
+n=$(rpc $P '["playlist","tracks","?"]' | jq -r '.result._tracks')
 for id in 145534376 145534390 916462 58082321; do
   idx=-1; for ((i = 0; i < n; i++)); do [[ "$(rpc $P '["playlist","path",'$i',"?"]' | jq -r .result._path)" == "deezer://$id."* ]] && idx=$i && break; done
   [ $idx -lt 0 ] && { echo "$id not in queue"; red=1; continue; }
