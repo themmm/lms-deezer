@@ -13,6 +13,7 @@ This repo is a fork of `philippe44/lms-deezer` (remote `upstream`); fork feature
 - Where upstream already has a label for a concept, use upstream's wording in every language. Never change the text of an existing upstream key in `strings.txt`; that only creates merge conflicts and a second wording for the same thing.
 - Keys for fork-only features are fine. They travel in the upstream pull request that brings that feature.
 - Nothing goes upstream (pull request, issue or claimed bug) on the strength of reading the code alone. Reproduce it on a running LMS first and record the evidence in a fork issue; only then take it upstream. The local LMS, its test player and the feedback loops live in `dev/` (see `dev/README.md`); nothing under `dev/` goes into an upstream pull request. Upstream pull request branches start from `upstream/main`, never from fork `main`, which carries `dev/` and these docs.
+- Before committing to an upstream pull request branch or writing its text, read `docs/agents/upstream-pr.md`: GitHub identity for the commits, title and body format.
 - Missing translations of upstream keys go upstream too, but collected into one pull request, never one key at a time, so the maintainer is not flooded with pull requests.
 
 ## Commits
