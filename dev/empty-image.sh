@@ -5,16 +5,18 @@
 # lists favourites unfiltered.
 #   1. wipes LMS's cache (cache.db, which holds the plugin's cached favourites and track metadata
 #      with their covers already computed) and restarts LMS, so the code under test computes them
-#   2. My Music -> Tracks: no item's icon may be the blank image
+#   2. My collection -> Tracks: no item's icon may be the blank image
 #   3. 3121382 queued by URL: its artwork in `status` may not be the blank image
 # Prints counts and track names, never secrets. exit 1 = RED, exit 2 = inconclusive.
 D=$(cd "$(dirname "$0")" && pwd); P=02:00:00:00:00:08
 EMPTY=d41d8cd98f00b204e9800998ecf8427e
-TRACKS=3.2     # My Music -> Tracks in the plugin's menu
+TRACKS=3.2     # My collection -> Tracks in the plugin's menu
 rpc() { "$D/rpc.sh" "$@"; }
 red=0
 
-docker stop lms-deezer-dev >/dev/null && rm -f "$D"/config/cache/cache.db "$D"/config/cache/cache.db-*
+# without the wipe, covers cached by an earlier run could give a false green
+docker stop lms-deezer-dev >/dev/null && rm -f "$D"/config/cache/cache.db "$D"/config/cache/cache.db-* ||
+  { echo "could not stop LMS and wipe its cache"; echo "VERDICT: inconclusive"; exit 2; }
 "$D/restart.sh" || { echo "VERDICT: inconclusive"; exit 2; }
 
 # with an empty cache, fetching the favourites can take longer than rpc.sh's timeout: warm up first
@@ -25,11 +27,11 @@ done
 R=$(rpc $P '["deezer","items",0,2000,"item_id:'$TRACKS'"]')
 n=$(jq -r '.result.loop_loop // [] | length' <<<"$R" 2>/dev/null)
 audio=$(jq -r '[.result.loop_loop // [] | .[] | select(.isaudio == 1)] | length' <<<"$R" 2>/dev/null)
-[[ "$audio" =~ ^[1-9][0-9]*$ ]] || { echo "My Music -> Tracks: no tracks (no answer or wrong menu id)"; echo "VERDICT: inconclusive"; exit 2; }
+[[ "$audio" =~ ^[1-9][0-9]*$ ]] || { echo "My collection -> Tracks: no tracks (no answer or wrong menu id)"; echo "VERDICT: inconclusive"; exit 2; }
 blank=$(jq -r --arg e "$EMPTY" '[.result.loop_loop[] | select((.image // "") | contains($e))] | length' <<<"$R")
 noicon=$(jq -r '[.result.loop_loop[] | select((.image // "") == "")] | length' <<<"$R")
 placeholder=$(jq -r '[.result.loop_loop[] | select((.image // "") | test("plugins/Deezer/html/"))] | length' <<<"$R")
-echo "My Music -> Tracks: $audio tracks, blank image=$blank, placeholder=$placeholder, no icon=$noicon"
+echo "My collection -> Tracks: $audio tracks, blank image=$blank, placeholder=$placeholder, no icon=$noicon"
 jq -r --arg e "$EMPTY" '.result.loop_loop[] | select((.image // "") | contains($e)) | "  blank: " + .name' <<<"$R" | head -20
 [ "$blank" -ne 0 ] && red=1
 

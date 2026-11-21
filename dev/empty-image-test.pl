@@ -19,8 +19,9 @@ BEGIN { $file = File::Spec->rel2abs(shift // dirname(__FILE__) . '/plugin/API.pm
 
 use constant PLACEHOLDER => 'plugins/Deezer/html/deezer.png';
 use constant EMPTY => 'd41d8cd98f00b204e9800998ecf8427e';
-use constant OWN   => '896e9bf452c6942ee9c04cf4bec6467d';
-use constant ALBUM => '38bc36ecd969f166a55a7e630bbaa3aa';
+use constant OWN_IMAGE   => '896e9bf452c6942ee9c04cf4bec6467d';
+use constant ALBUM_IMAGE => '38bc36ecd969f166a55a7e630bbaa3aa';
+use constant ALBUM_COVER => 'https://api.deezer.com/album/301217/image';    # redirects to the album's image
 
 BEGIN {
 	no strict 'refs';
@@ -42,7 +43,7 @@ my $track = sub {
 	my ($own, $album) = @_;
 	return {
 		id => 3121382, type => 'track', title => 'Coffee In The Pot', duration => 180, md5_image => $own,
-		album => { id => 301217, type => 'album', cover => 'https://api.deezer.com/album/301217/image',
+		album => { id => 301217, type => 'album', cover => ALBUM_COVER,
 			cover_big => $cdn->(cover => $album), md5_image => $album },
 	};
 };
@@ -57,20 +58,29 @@ my $playlist = sub {
 		picture_type => 'playlist', picture => 'https://api.deezer.com/playlist/13715702701/image',
 		picture_big => $cdn->(playlist => $md5) };
 };
+# artists have no md5_image, only picture URLs
+my $artist = sub {
+	my ($md5) = @_;
+	return { id => 12332, type => 'artist', name => 'Flash and the Pan', picture_type => 'artist',
+		picture => 'https://api.deezer.com/artist/12332/image',
+		picture_big => $cdn->(artist => $md5), picture_medium => $cdn->(artist => $md5) };
+};
 
 # [ name, item, usePlaceholder, check of the returned image, what is expected ]
 my $shows = sub { my $md5 = shift; sub { ($_[0] // '') =~ /\b$md5\b/ } };
 my $isPlaceholder = sub { ($_[0] // '') eq PLACEHOLDER };
 my $isNothing = sub { !$_[0] };
 my @cases = (
-	[ 'track with its own image',                  $track->(OWN, ALBUM),     1, $shows->(OWN),   'own image' ],
-	[ 'track without image, album has a cover',    $track->(EMPTY, ALBUM),   1, sub { $shows->(ALBUM)->(@_) || ($_[0] // '') eq 'https://api.deezer.com/album/301217/image' }, "album's cover" ],
-	[ 'track and album without image',             $track->(EMPTY, EMPTY),   1, $isPlaceholder,  'placeholder' ],
-	[ 'track and album without image, no placeholder', $track->(EMPTY, EMPTY), 0, $isNothing,    'no image' ],
-	[ 'album with its own image',                  $album->(ALBUM),          1, $shows->(ALBUM), 'own image' ],
-	[ 'album without image',                       $album->(EMPTY),          1, $isPlaceholder,  'placeholder' ],
-	[ 'playlist with its own image',               $playlist->(OWN),         1, $shows->(OWN),   'own image' ],
-	[ 'playlist without image',                    $playlist->(EMPTY),       1, $isPlaceholder,  'placeholder' ],
+	[ 'track with its own image',                        $track->(OWN_IMAGE, ALBUM_IMAGE),    1, $shows->(OWN_IMAGE),   'own image' ],
+	[ 'track without image, album has a cover',          $track->(EMPTY, ALBUM_IMAGE),        1, sub { $shows->(ALBUM_IMAGE)->(@_) || ($_[0] // '') eq ALBUM_COVER }, "album's cover" ],
+	[ 'track and album without image',                   $track->(EMPTY, EMPTY),              1, $isPlaceholder,        'placeholder' ],
+	[ 'track and album without image, no placeholder',   $track->(EMPTY, EMPTY),              0, $isNothing,            'no image' ],
+	[ 'album with its own image',                        $album->(ALBUM_IMAGE),               1, $shows->(ALBUM_IMAGE), 'own image' ],
+	[ 'album without image',                             $album->(EMPTY),                     1, $isPlaceholder,        'placeholder' ],
+	[ 'playlist with its own image',                     $playlist->(OWN_IMAGE),              1, $shows->(OWN_IMAGE),   'own image' ],
+	[ 'playlist without image',                          $playlist->(EMPTY),                  1, $isPlaceholder,        'placeholder' ],
+	[ 'artist with its own image',                       $artist->(OWN_IMAGE),                1, $shows->(OWN_IMAGE),   'own image' ],
+	[ 'artist without image',                            $artist->(EMPTY),                    1, $isPlaceholder,        'placeholder' ],
 );
 
 my $fail = 0;

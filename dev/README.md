@@ -50,7 +50,7 @@ Each loop prints its evidence and ends with `VERDICT: green` (exit 0) or `VERDIC
 |---|---|---|
 | `./hr81-queue.sh` | Playlist "Love Machine": tracks without rights and Fallback are left out, the 12 Fallback-only tracks are in, playback goes on after "Lovemachine" | needs `PACE=6000000 ./player.sh` |
 | `./queue-status.sh` | Playlist "Love Machine" added by URL: every queue entry is a Deezer track (no sort link), `status` over the whole queue answers with a title for each, no "unblessed reference" error in `server.log` (fork #14) | |
-| `./empty-image.sh` | Deezer's empty image (MD5 of ""): wipes LMS's cache (`config/cache/cache.db`) and restarts, then no icon in My Music → Tracks and no queued track's artwork may be the blank image (fork #15) | needs favourite tracks with that marker, as on the test account |
+| `./empty-image.sh` | Deezer's empty image (MD5 of ""): wipes LMS's cache (`config/cache/cache.db`) and restarts, then no icon in My collection → Tracks and no queued track's artwork may be the blank image (fork #15) | needs favourite tracks with that marker, as on the test account |
 | `perl empty-image-test.pl [API.pm]` | Runs the plugin's own `getImageUrl` on track, album and playlist items with and without the empty image | no LMS needed; defaults to `plugin/API.pm` |
 | `./hr82-album.sh` | Boney M. album 108288 queues 14 tracks, Phil Carmen 248956 queues 0 | |
 | `./hr81-cover.sh` | Cover of 4 Fallback-only tracks before, during and after playback, each cover id checked on the CDN | |
