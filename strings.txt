@@ -469,7 +469,7 @@ PLUGIN_DEEZER_LIVE_PARAMS_DESC
 
 PLUGIN_DEEZER_CHANNELS
 	DA	Kanaler
-	DE	Kanäle
+	DE	Channels
 	EN	Channels
 	FR	Canaux
 	HU	Channels
@@ -517,7 +517,7 @@ PLUGIN_DEEZER_DISLIKE_ARTIST
 
 PLUGIN_DEEZER_EXPLORE
 	DA	Udforske
-	DE	Erkunden
+	DE	Entdecken
 	EN	Explore
 	FR	Explorer
 	HU	Felfedezés
@@ -525,7 +525,7 @@ PLUGIN_DEEZER_EXPLORE
 
 PLUGIN_DEEZER_HISTORY
 	DA	Historik for lytning
-	DE	Hörverlauf
+	DE	Gehörte Songs
 	EN	Listening History
 	FR	Historique d'écoute
 	HU	Lejátszás előzmények
@@ -533,7 +533,7 @@ PLUGIN_DEEZER_HISTORY
 
 PLUGIN_DEEZER_PERSONAL
 	DA	Personligt bibliotek
-	DE	Persönliche Sammlung
+	DE	Meine MP3s
 	EN	Personal library
 	FR	Bibliothèque personnelle
 	HU	Személyes könyvtár
@@ -541,7 +541,7 @@ PLUGIN_DEEZER_PERSONAL
 
 PLUGIN_DEEZER_COLLECTION
 	DA	Mit bibliotek
-	DE	Meine Sammlung
+	DE	Bibliothek
 	EN	My collection
 	FR	Ma collection
 	HU	Saját gyűjtemény
@@ -582,3 +582,15 @@ PLUGIN_DEEZER_RIGHTS_CACHE_TTL_DESC
 PLUGIN_DEEZER_NO_PLAYABLE_TRACKS
 	DE	Keine abspielbaren Tracks verfügbar. Möglicherweise sind diese Titel in deiner Region oder mit deinem Abonnement nicht lizenziert.
 	EN	No playable tracks available. These tracks may not be licensed for your region or subscription.
+
+PLUGIN_DEEZER_TOP_RESULT
+	DE	Top-Ergebnis
+	EN	Top result
+
+PLUGIN_DEEZER_RECENT_SEARCHES
+	DE	Zuletzt gesucht
+	EN	Recent searches
+
+PLUGIN_DEEZER_RADIO_STATIONS
+	DE	Radiosender
+	EN	Radio stations
