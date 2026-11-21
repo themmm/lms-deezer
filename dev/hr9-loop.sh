@@ -3,7 +3,7 @@
 # Sets plugin.deezer to <level> in log.conf, restarts LMS (new session + refreshArl at startup),
 # exercises the settings page (bad ARL, then re-adding the real one), plays a track and Flow,
 # then counts secrets in the log written since the restart. Prints counts and log locations, never values.
-# usage: hr9-loop.sh [DEBUG|INFO|WARN|ERROR]     exit 1 = RED (an ARL or ARL-shaped string is in the log),
+# usage: hr9-loop.sh [DEBUG|INFO|WARN|ERROR]     exit 1 = RED (an ARL, ARL-shaped string or session token value is in the log),
 #        exit 2 = inconclusive (network errors kept the gw paths from running)
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
@@ -50,20 +50,25 @@ NEW=$PRIV/new.log; tail -c +$((OFF + 1)) "$LOG" >"$NEW"
 # attribute every matching line (also continuation lines of multi-line dumps) to the log call that wrote it
 loc_re() { awk -v re="$1" 'match($0, /^\[[^]]+\] [A-Za-z:_]+ \([0-9]+\)/) { cur = substr($0, RSTART, RLENGTH); sub(/^\[[^]]+\] /, "", cur) } $0 ~ re { print cur }' "$NEW" | sort | uniq -c | sed 's/^/      /'; }
 loc_f() { awk 'NR==FNR { k[$0]; next } match($0, /^\[[^]]+\] [A-Za-z:_]+ \([0-9]+\)/) { cur = substr($0, RSTART, RLENGTH); sub(/^\[[^]]+\] /, "", cur) } { for (x in k) if (index($0, x)) { print cur; break } }' "$1" "$NEW" | sort | uniq -c | sed 's/^/      /'; }
-count() { local label=$1 re=$2 n; n=$(grep -cE -- "$re" "$NEW"); printf '%-44s %s\n' "$label" "$n"; [ "$n" -gt 0 ] && loc_re "$re"; }
+# count <label> <ERE> [secret]: with "secret", hits are added to n_tok and make the run RED
+n_tok=0
+count() { local label=$1 re=$2 n; n=$(grep -cE -- "$re" "$NEW"); printf '%-44s %s\n' "$label" "$n"; [ "$n" -gt 0 ] && loc_re "$re"; [ "${3:-}" = secret ] && n_tok=$((n_tok + n)); return 0; }
+# a quote, optionally escaped as \" (JSON string inside a Data::Dump)
+Q='\\?["'"'"']?'
 
 echo "=== level=$LEVEL  log bytes=$(wc -c <"$NEW")  plugin lines=$(grep -c 'Plugins::Deezer' "$NEW")"
 n_real=$(grep -cFf "$PRIV/arls" "$NEW"); printf '%-44s %s\n' "real ARL (current or rotated)" "$n_real"; [ "$n_real" -gt 0 ] && loc_f "$PRIV/arls"
 n_fake=$(grep -cFf "$PRIV/fake" "$NEW"); printf '%-44s %s\n' "rejected ARL from settings" "$n_fake"; [ "$n_fake" -gt 0 ] && loc_f "$PRIV/fake"
 count "any 192-hex string (ARL-shaped)" '[0-9a-fA-F]{192}'; n_hex=$(grep -cE '[0-9a-fA-F]{192}' "$NEW")
-count "sid / SESSION_ID value" "(SESSION_ID|[^a-z]sid)[\"']?[[:space:]]*(=>|=|:)[[:space:]]*[\"']?[0-9a-z]{20,}"
-count "license_token value" "license_token[\"']?[[:space:]]*(=>|=|:)[[:space:]]*[\"']?[A-Za-z0-9_-]{20,}"
-count "USER_TOKEN value" "USER_TOKEN[\"']?[[:space:]]*(=>|=|:)[[:space:]]*[\"']?[0-9a-f]{20,}"
-count "api_token / checkForm value" "(api_token=|checkForm[\"']?[[:space:]]*(=>|:)[[:space:]]*[\"']?)[A-Za-z0-9._-]{20,}"
+count "sid / SESSION_ID value" "(SESSION_ID|[^a-z]sid)$Q[[:space:]]*(=>|=|:)[[:space:]]*$Q[0-9a-z]{20,}" secret
+count "license_token value" "license_token$Q[[:space:]]*(=>|=|:)[[:space:]]*$Q[A-Za-z0-9_-]{20,}" secret
+count "USER_TOKEN value" "USER_TOKEN$Q[[:space:]]*(=>|=|:)[[:space:]]*$Q[0-9a-f]{20,}" secret
+count "api_token / checkForm value" "(api_token=|checkForm$Q[[:space:]]*(=>|:)[[:space:]]*$Q)[A-Za-z0-9._-]{20,}" secret
 count "signed stream URL (hdnea=)" 'hdnea='
 
 if [ $((n_real + n_fake + n_hex)) -gt 0 ]; then echo "VERDICT: RED (ARL in server.log)"; exit 1; fi
+if [ "$n_tok" -gt 0 ]; then echo "VERDICT: RED (session token values in server.log)"; exit 1; fi
 if ! grep -q 'Plugins::Deezer' "$NEW"; then echo "VERDICT: inconclusive (no plugin lines in the log since the restart)"; exit 2; fi
 n_err=$(grep -c "API::Async.*Error:" "$NEW")
 if [ "$n_err" -gt 0 ]; then echo "VERDICT: inconclusive ($n_err Async network errors during the run, gw paths not exercised)"; exit 2; fi
-echo "VERDICT: green (no ARL in server.log)"
+echo "VERDICT: green (no ARL or session token in server.log)"

@@ -52,6 +52,7 @@ Each loop prints its evidence and ends with `VERDICT: green` (exit 0) or `VERDIC
 | `./hr82-album.sh` | Boney M. album 108288 queues 14 tracks, Phil Carmen 248956 queues 0 | |
 | `./hr81-cover.sh` | Cover of 4 Fallback-only tracks before, during and after playback, each cover id checked on the CDN | |
 | `./hr9-loop.sh [DEBUG\|INFO\|WARN]` | Restarts LMS, re-adds the account, plays a track and Flow, then counts ARLs and session tokens in `server.log`. Prints counts and log locations, never values | leaves that log level in `config/prefs/log.conf` |
+| `perl redact-test.pl [Async.pm]` | Runs the plugin's own `_redact`/`_dump` on fake secrets in every shape they reach the log: dumped hash, query string, Cookie header, JSON string inside a dump | no LMS needed; defaults to `plugin/API/Async.pm` |
 | `./hr81-loop.sh <url> [start] [secs] [end]` | Timeline of the player state while playing `<url>`, to see where playback stops | |
 | `./hr81-probe.sh <id>...` | Plays single track ids: plays or not, resolved Fallback id, no rights and no Fallback | |
 | `./hr8-loop.sh <label> <url>` | Raw format from Deezer next to the bitrate LMS reports (fork #8) | needs the `[DEBUG-hr8]` probes, which are not in the code |
